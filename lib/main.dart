@@ -12,9 +12,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   await Supabase.initialize(
-    url: 'supabase_url',
+    url: 'SUPABASE_URL',
     anonKey:
-        'supabase_key',)
+        'SUPABASE_ANON_KEY',)
   runApp(const ChatApp());
 }
 
