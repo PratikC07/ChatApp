@@ -12,10 +12,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   await Supabase.initialize(
-    url: 'https://oqsxxhqrulypefnythlv.supabase.co',
+    url: 'supabase_url',
     anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xc3h4aHFydWx5cGVmbnl0aGx2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA0OTM3OTgsImV4cCI6MjA1NjA2OTc5OH0.U6gUdvvfp8ZJC_QpDDh4uH_1jip2gvgVYMvqItyOvEY',
-  );
+        'supabase_key',)
   runApp(const ChatApp());
 }
 
