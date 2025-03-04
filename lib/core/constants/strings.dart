@@ -20,3 +20,4 @@ const home = '/home';
 const wrapper = '/wrapper';
 const chatScreen = '/chatScreen';
 const profile = '/profile';
+const displayImage = '/displayImage';

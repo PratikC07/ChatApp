@@ -48,6 +48,20 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
+  void updateUser(String name, String email, String imageUrl) {
+    log("Before UserProvider: ${_currentUser?.imageUrl}");
+    if (_currentUser != null) {
+      _currentUser = _currentUser!.copyWith(
+        name: name,
+        email: email,
+        imageUrl: imageUrl,
+      ); // Update user data
+      log("UserProvider updated!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+      log("After UserProvider: ${_currentUser?.imageUrl}");
+      notifyListeners(); // ✅ Notify listeners to update UI in ProfileScreen
+    }
+  }
+
   clearUser() {
     _currentUser = null;
     log("currentUser set to null");

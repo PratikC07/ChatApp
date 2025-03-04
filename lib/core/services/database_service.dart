@@ -42,6 +42,19 @@ class DatabaseService {
     }
   }
 
+  Future<Map<String, dynamic>?> fetchUser(String userId) async {
+    try {
+      final res = await _fire.collection('users').doc(userId).get();
+      if (!res.exists || res.data() == null) {
+        throw Exception("User not found");
+      }
+      return res.data();
+    } catch (e) {
+      log("Error Occured while fetching User Info");
+      rethrow;
+    }
+  }
+
   Stream<QuerySnapshot<Map<String, dynamic>>> fetchUserStream(
     String currentUserId,
   ) =>
@@ -55,9 +68,28 @@ class DatabaseService {
     return _fire
         .collection("chatRooms")
         .where(
-          "users",
-          arrayContains: userId,
-        ) // Fetch rooms where the user exists
+          "users.$userId",
+          isNull: false,
+        ) // ✅ Check if userId exists in the users map
         .snapshots();
+  }
+
+  ////////////////////////////
+  Future<void> updateUserInfo(
+    String userId,
+    String name,
+    String email,
+    String profilePicUrl,
+  ) async {
+    try {
+      await _fire.collection('users').doc(userId).update({
+        'name': name,
+        'email': email,
+        'imageUrl': profilePicUrl,
+      });
+    } catch (e) {
+      log("Error while updating user info: $e");
+      rethrow;
+    }
   }
 }

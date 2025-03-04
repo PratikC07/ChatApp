@@ -3,7 +3,9 @@ import 'package:chat_app/core/models/user_model.dart';
 import 'package:chat_app/ui/screens/auth/login/login_screen.dart';
 import 'package:chat_app/ui/screens/auth/signup/signup_screen.dart';
 import 'package:chat_app/ui/screens/bottom_navigation/chats_list/chats_room/chat_screen.dart';
+import 'package:chat_app/ui/screens/bottom_navigation/chats_list/display_image/display_image_screen.dart';
 import 'package:chat_app/ui/screens/bottom_navigation/profile/profile_screen.dart';
+import 'package:chat_app/ui/screens/bottom_navigation/profile/profile_viewmodel.dart';
 import 'package:chat_app/ui/screens/home/home_screen.dart';
 import 'package:chat_app/ui/screens/splash/splash_screen.dart';
 import 'package:chat_app/ui/screens/wrapper/wrapper.dart';
@@ -30,6 +32,12 @@ class RouteUtils {
 
       case profile:
         return MaterialPageRoute(builder: (context) => ProfileScreen());
+
+      case displayImage:
+        return MaterialPageRoute(
+          builder:
+              (context) => DisplayImageScreen(model: args as ProfileViewmodel),
+        );
 
       case chatScreen:
         return MaterialPageRoute(

@@ -12,6 +12,7 @@ class ChatsListViewmodel extends BaseViewmodel {
   Timer? _timer; // Timer instance for periodic updates
 
   ChatsListViewmodel(this._db, this._currentUser) {
+    fetchChats();
     fetchUsers();
     _startAutoRefresh(); // Start auto-refresh for timestamps
   }
@@ -26,38 +27,73 @@ class ChatsListViewmodel extends BaseViewmodel {
   List<Map<String, dynamic>> _chatRooms = [];
   List<Map<String, dynamic>> get chatRooms => _chatRooms;
 
+  List<Map<String, dynamic>> _filteredChatRooms = [];
+  List<Map<String, dynamic>> get filteredChatRooms => _filteredChatRooms;
+
   search(String value) {
     _filteredUsers =
         _users.where((e) => e.name.toLowerCase().contains(value)).toList();
     notifyListeners();
   }
 
-  // fetchUsers() async {
-  //   try {
-  //   setState(ViewState.loading);
-  //     final res = await _db.fetchUsers(_currentUser.uid);
-  //     _users =
-  //         res.map((e) => UserModel.fromMap(e)).toList(); // convert to UserModel
-  //     _filteredUsers = _users;
-  //     notifyListeners();
-  //     setState(ViewState.idle);
-  //   } catch (e) {
-  //     setState(ViewState.idle);
-  //     log("Error Fetching Users: $e");
-  //   }
+  // searchChats(String value) {
+  //   _filteredChatRooms =
+  //       _chatRooms.where((chatRoom) {
+  //         // Extract users map
+  //         final usersMap = chatRoom['users'] as Map<String, dynamic>;
+
+  //         // Get the other user by filtering out the current user
+  //         usersMap.remove(_currentUser.uid);
+  //         final otherUser = UserModel.fromMap(usersMap.values.first);
+
+  //         // Get last message content
+  //         final lastMessage = chatRoom["lastMessage"]?["content"] ?? "";
+
+  //         return otherUser.name.toLowerCase().contains(value.toLowerCase()) ||
+  //             lastMessage.toLowerCase().contains(value.toLowerCase());
+  //       }).toList();
+
+  //   // log("###########FilterChats: $_filteredChatRooms");
+
+  //   notifyListeners();
   // }
 
-  fetchUsers() async {
+  searchChats(String value) {
+    _filteredChatRooms =
+        _chatRooms.where((chatRoom) {
+          final usersMap = Map<String, dynamic>.from(
+            chatRoom['users'],
+          ); // Clone map
+
+          // Get the other user by filtering out the current user
+          usersMap.remove(_currentUser.uid);
+          if (usersMap.isEmpty) return false; // Safety check
+
+          final otherUser = UserModel.fromMap(usersMap.values.first);
+          final lastMessage = chatRoom["lastMessage"]?["content"] ?? "";
+
+          return otherUser.name.toLowerCase().contains(value.toLowerCase()) ||
+              lastMessage.toLowerCase().contains(value.toLowerCase());
+        }).toList();
+
+    notifyListeners();
+  }
+
+  fetchUserModel(String userId) async {
+    try {
+      Map<String, dynamic>? userData = await _db.fetchUser(userId);
+      if (userData != null) {
+        return userData;
+      }
+    } catch (e) {
+      log("Error while fetching userModel data: $e");
+      rethrow;
+    }
+  }
+
+  fetchChats() async {
     try {
       setState(ViewState.loading);
-      // final res = await _db.fetchUsers(_currentUser.uid!);
-
-      _db.fetchUserStream(_currentUser.uid).listen((data) {
-        _users = data.docs.map((e) => UserModel.fromMap(e.data())).toList();
-        _filteredUsers = users;
-        log("#################Filtered Users: $_filteredUsers");
-        notifyListeners();
-      });
 
       // 2️⃣ Fetch existing chat rooms
       _db.getChatRooms(_currentUser.uid).listen((data) {
@@ -70,78 +106,35 @@ class ChatsListViewmodel extends BaseViewmodel {
           int timeB = b["lastMessage"]?["timestamp"] ?? 0;
           return timeB.compareTo(timeA); // Sort latest messages first
         });
+        _filteredChatRooms = _chatRooms;
+        // log("################ChatData : $_chatRooms");
+        log("################FilteredChatData : $_filteredChatRooms");
 
-        log("_chatRooms: //////////////////////////////${_chatRooms}");
+        // log("_chatRooms: //////////////////////////////$_chatRooms");
+        setState(ViewState.idle);
         notifyListeners();
       });
-
-      // it is return by getChatRooms()
-
-      //       {
-      //   "lastMessage": {
-      //     "senderId": "3m6EEfB4lLZJTuRBmrK7kUbQg5U2",
-      //     "content": "hey you also fuck off",
-      //     "timestamp": 1740639201493
-      //   },
-      //   "unreadCounters": {
-      //     "f3D905EoU0QisLZDRg9vwmmy0zC2": 0,
-      //     "3m6EEfB4lLZJTuRBmrK7kUbQg5U2": 0
-      //   },
-      //   "users": [
-      //     "3m6EEfB4lLZJTuRBmrK7kUbQg5U2",
-      //     "f3D905EoU0QisLZDRg9vwmmy0zC2"
-      //   ]
-      // }
-
-      // if (res != null) {
-      //   _users = res.map((e) => UserModel.fromMap(e)).toList();
-      //   _filteredUsers = _users;
-      //   notifyListeners();
-      // }
-      setState(ViewState.idle);
     } catch (e) {
       setState(ViewState.idle);
       log("Error Fetching Users: $e");
     }
   }
 
-  List<Map<String, dynamic>> getMergedChatList() {
-    // Step 1: Create a Map from chatRooms for quick lookup
-    final Map<String, dynamic> chatRoomMap = {
-      for (var chat in chatRooms)
-        chat["users"].firstWhere((uid) => uid != _currentUser.uid): chat,
-    };
+  fetchUsers() async {
+    try {
+      setState(ViewState.loading);
 
-    // Step 2: Separate users into two lists
-    List<Map<String, dynamic>> usersWithChats = [];
-    List<Map<String, dynamic>> usersWithoutChats = [];
-
-    for (var user in filteredUsers) {
-      if (chatRoomMap.containsKey(user.uid)) {
-        // If user has an active chat
-        final chatRoom = chatRoomMap[user.uid];
-        usersWithChats.add({
-          "user": user,
-          "lastMessage": chatRoom["lastMessage"]?["content"] ?? "",
-          "timestamp": chatRoom["lastMessage"]?["timestamp"] ?? 0,
-          "unreadCount": chatRoom["unreadCounters"]?[_currentUser.uid] ?? 0,
-        });
-      } else {
-        // If user has no active chat
-        usersWithoutChats.add({
-          "user": user,
-          "lastMessage": "",
-          "timestamp": 0,
-          "unreadCount": 0,
-        });
-      }
+      _db.fetchUserStream(_currentUser.uid).listen((data) {
+        _users = data.docs.map((e) => UserModel.fromMap(e.data())).toList();
+        _filteredUsers = users;
+        log("#################Filtered Users: $_filteredUsers");
+        setState(ViewState.idle);
+        notifyListeners();
+      });
+    } catch (e) {
+      log("Error while fetching new users: $e");
+      rethrow;
     }
-
-    // Step 3: Sort users with chats by latest message timestamp
-    usersWithChats.sort((a, b) => b["timestamp"].compareTo(a["timestamp"]));
-
-    // Step 4: Merge both lists and return
-    return [...usersWithChats, ...usersWithoutChats];
   }
 
   void _startAutoRefresh() {

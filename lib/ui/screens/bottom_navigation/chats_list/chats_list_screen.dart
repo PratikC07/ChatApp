@@ -9,9 +9,7 @@ import 'package:chat_app/core/models/user_model.dart';
 import 'package:chat_app/core/services/database_service.dart';
 import 'package:chat_app/ui/screens/bottom_navigation/chats_list/chats_list_viewmodel.dart';
 import 'package:chat_app/ui/screens/other/user_provider.dart';
-
 import 'package:chat_app/ui/widgets/textfield_widget.dart';
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -21,17 +19,14 @@ class ChatsListScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    onTap(UserModel currentUser, UserModel user) {
+    onTap(UserModel currentUser, UserModel otherUser) {
       final chatRoomId =
-          (currentUser!.uid.compareTo(user.uid) > 0)
-              ? "${currentUser.uid}_${user.uid}"
-              : "${user.uid}_${currentUser.uid}";
-
+          (currentUser.uid.compareTo(otherUser.uid) > 0)
+              ? "${currentUser.uid}_${otherUser.uid}"
+              : "${otherUser.uid}_${currentUser.uid}";
       log("chatRoomId: $chatRoomId in onTap Method");
-
       ChatService().resetUnreadCount(chatRoomId, currentUser.uid);
-
-      Navigator.pushNamed(context, chatScreen, arguments: user);
+      Navigator.pushNamed(context, chatScreen, arguments: otherUser);
     }
 
     final currentUser = context.read<UserProvider>().user;
@@ -39,8 +34,6 @@ class ChatsListScreen extends StatelessWidget {
       create: (context) => ChatsListViewmodel(DatabaseService(), currentUser!),
       child: Consumer<ChatsListViewmodel>(
         builder: (context, model, _) {
-          final mergedChatList = model.getMergedChatList();
-          log("MergedChatList===== $mergedChatList");
           return Padding(
             padding: EdgeInsets.symmetric(
               horizontal: 1.sw * 0.05,
@@ -57,50 +50,69 @@ class ChatsListScreen extends StatelessWidget {
                 TextfieldWidget(
                   hintText: "Search Here",
                   isSearch: true,
-                  onChanged: model.search,
+                  onChanged: model.searchChats,
                 ),
                 5.verticalSpace,
                 model.state == ViewState.loading
                     ? const Expanded(
                       child: Center(child: CircularProgressIndicator()),
                     )
-                    : model.chatRooms.isEmpty &&
-                        model
-                            .users
-                            .isEmpty //////
+                    : model.filteredChatRooms.isEmpty
                     ? const Expanded(child: Center(child: Text("No Users yet")))
                     : Expanded(
                       child: ListView.separated(
                         padding: EdgeInsets.symmetric(vertical: 20),
-                        itemCount: mergedChatList.length,
+                        itemCount: model.filteredChatRooms.length,
+                        shrinkWrap:
+                            true, // Prevents unnecessary rendering issues
+                        physics:
+                            const BouncingScrollPhysics(), // Adds smooth scrolling
                         separatorBuilder: (context, index) => 8.verticalSpace,
                         itemBuilder: (context, index) {
-                          // final user = model.filteredUsers[index];
+                          final chatRoom = model.filteredChatRooms[index];
+                          log("ChatRoom $index => $chatRoom");
 
-                          // // Check if chat room exists
-                          // final chatRoom = model.chatRooms.firstWhereOrNull(
-                          //   (chat) => chat["users"].contains(user.uid),
-                          // );
+                          // // Extract users map from chatRoom
+                          // Map<String, dynamic> usersMap = chatRoom['users'];
 
-                          final chatData = mergedChatList[index];
-                          final userModelData = chatData["user"];
+                          // // Remove current user from the map
+                          // usersMap.remove(currentUser!.uid);
+
+                          // Extract users map copy from chatRoom
+                          Map<String, dynamic> usersMap = Map.from(
+                            chatRoom['users'],
+                          );
+
+                          // Remove current user from the map
+                          usersMap.remove(currentUser!.uid);
+
+                          if (usersMap.isEmpty) {
+                            return const SizedBox.shrink(); // Avoid errors
+                          }
+
+                          // Get the remaining user (which is the other user)
+                          UserModel otherUser = UserModel.fromMap(
+                            usersMap
+                                .values
+                                .first, // convert usersMap object into list by removing their keys and retaining only values and first means first item (UsersMap is a object of objects)
+                          );
+
+                          log("User Model: $otherUser");
 
                           return ChatTile(
-                            user: userModelData,
-                            lastMessage: chatData["lastMessage"],
-                            // chatRoom?["lastMessage"]?["content"] ?? "",
-                            timestamp: chatData["timestamp"],
-                            // chatRoom?["lastMessage"]?["timestamp"] ?? 0,
-                            unreadCount: chatData["unreadCount"],
+                            user: otherUser,
 
-                            // (chatRoom?["unreadCounters"] != null &&
-                            //         chatRoom?["unreadCounters"].containsKey(
-                            //           currentUser!.uid,
-                            //         ))
-                            //     ? chatRoom!["unreadCounters"][currentUser!
-                            //         .uid]
-                            //     : 0,
-                            onTap: () => onTap(currentUser!, userModelData),
+                            lastMessage:
+                                chatRoom["lastMessage"]?["content"] ?? "",
+
+                            timestamp:
+                                chatRoom["lastMessage"]?["timestamp"] ?? 0,
+
+                            unreadCount:
+                                chatRoom["unreadCounters"]?[currentUser.uid] ??
+                                0,
+
+                            onTap: () => onTap(currentUser, otherUser),
                           );
                         },
                       ),
@@ -183,7 +195,7 @@ class ChatTile extends StatelessWidget {
                   style: TextStyle(color: grey, fontSize: 12),
                 ),
             5.verticalSpace,
-            (unreadCount == 0 || unreadCount == null)
+            (unreadCount == 0)
                 ? const SizedBox(height: 15)
                 : CircleAvatar(
                   radius: 9.r,
@@ -200,22 +212,35 @@ class ChatTile extends StatelessWidget {
   }
 }
 
+// String getTimeAgo(int timestamp) {
+//   DateTime sentTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
+//   DateTime now = DateTime.now();
+//   Duration difference = now.difference(sentTime);
+
+//   if (difference.inMinutes < 1) {
+//     return "Just now"; // Instead of seconds
+//   } else if (difference.inMinutes < 60) {
+//     return "${difference.inMinutes} min ago";
+//   } else if (difference.inHours < 24) {
+//     return "${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago";
+//   } else if (difference.inDays == 1) {
+//     return "Yesterday";
+//   } else if (difference.inDays < 7) {
+//     return "${difference.inDays} days ago";
+//   } else {
+//     return DateFormat('MMM d, yyyy').format(sentTime); // Example: Mar 12, 2025
+//   }
+// }
+
 String getTimeAgo(int timestamp) {
   DateTime sentTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
   DateTime now = DateTime.now();
   Duration difference = now.difference(sentTime);
 
-  if (difference.inMinutes < 1) {
-    return "Just now"; // Instead of seconds
-  } else if (difference.inMinutes < 60) {
-    return "${difference.inMinutes} min ago";
-  } else if (difference.inHours < 24) {
-    return "${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago";
-  } else if (difference.inDays == 1) {
-    return "Yesterday";
-  } else if (difference.inDays < 7) {
-    return "${difference.inDays} days ago";
-  } else {
-    return DateFormat('MMM d, yyyy').format(sentTime); // Example: Mar 12, 2025
-  }
+  if (difference.inMinutes < 1) return "Just now";
+  if (difference.inMinutes < 60) return "${difference.inMinutes} min ago";
+  if (difference.inHours < 24) return "${difference.inHours} hours ago";
+  if (difference.inDays == 1) return "Yesterday";
+  if (difference.inDays < 7) return "${difference.inDays}d ago";
+  return DateFormat('MMM d, yyyy').format(sentTime); // Example: Mar 12, 2025
 }

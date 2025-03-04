@@ -56,21 +56,25 @@ class ChatViewmodel extends BaseViewmodel {
       // await _chatService.saveMessage(message.toMap(), chatRoomId);
       // _messageController.clear();
 
-      // 1️⃣ Save message in Firestore
+      // 1️⃣ Ensure chat room exists before adding the message
+      await _chatService.createChatRoomIfNotExists(_currentUser, _receiver);
+
+      // 2️⃣ Save message in Firestore
       await _chatService.saveMessage(message.toMap(), chatRoomId);
 
-      // 2️⃣ Update last message and unread counter
+      // 3️⃣ Update last message and unread counter
       log("updating the last message");
       await _chatService.updateLastMessage(
-        _currentUser.uid,
-        _receiver.uid,
+        _currentUser,
+        _receiver,
         message.content!,
         now.millisecondsSinceEpoch,
       );
 
-      // 3️⃣ Clear input field after sending
+      // 4️⃣ Clear input field after sending
       _messageController.clear();
     } catch (e) {
+      log("❌ Error sending message: $e");
       rethrow;
     }
   }
