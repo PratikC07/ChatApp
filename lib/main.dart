@@ -11,10 +11,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  await Supabase.initialize(
-    url: 'SUPABASE_URL',
-    anonKey:
-        'SUPABASE_ANON_KEY',)
+  await Supabase.initialize(url: 'SUPABASE_URL', anonKey: 'SUPABASE_ANON_KEY');
   runApp(const ChatApp());
 }
 
